@@ -827,7 +827,7 @@ function generateSchedule(grade) {
       }
     }
     return null;
-  }
+  };
 
   // ================== PRIMARY GRADES (4-6) ==================
   if (isPrimary) {
@@ -849,88 +849,99 @@ function generateSchedule(grade) {
       subjects.primary.threePerWeek || []
     );
 
-// Track whether Creative Arts & Sports has already used its 2-lesson day
-let casDoubleDayUsed = false;
+    let casDoubleDayUsed = false;
 
-multiSubjects.forEach(subj => {
-  while (placed[subj] < weeklyCounts[subj]) {
-    let availableSlots = [];
-    for (let day of days) {
-
-      const dayCount = schedule[day].filter(s => s.includes(subj)).length;
-
-      // ✅ Creative Arts & Sports special weekly rule
-      if (subj === "Creative Arts & Sports") {
-        // Enforce rule: 1 lesson daily, except 1 day can have 2
-        if (dayCount >= 1 && casDoubleDayUsed) continue; 
-        if (dayCount >= 2) continue;
-
-      } else {
-        // ❌ All other primary subjects only once per day
-        if (schedule[day].some(s => s.includes(subj))) continue;
-      }
-
-      for (let p of lessonSlots) {
-        if (!schedule[day][p] && isFree(assign[subj], day, p + 1)) {
-
-          // Maths morning rule
-          if ((subj === 'Mathematics' || subj === 'Maths') && !mathsPeriodsOnly.includes(p)) continue;
-
-          // ✅ No consecutive CAS periods
-          if (subj === "Creative Arts & Sports" && p > 0 && schedule[day][p-1].includes(subj)) continue;
-
-          availableSlots.push({ day, p });
-        }
-      }
-    }
-
-    if (!availableSlots.length) break;
-    const { day, p } = availableSlots[Math.floor(Math.random() * availableSlots.length)];
-
-    // ✅ Mark CAS 2-lesson day when second slot is filled
-    if (subj === "Creative Arts & Sports") {
-      const todayCount = schedule[day].filter(s => s.includes(subj)).length;
-      if (todayCount === 1) casDoubleDayUsed = true;
-    }
-
-    fillSlot(day, p, subj);
-  }
-});
-
-
-  } 
-  // ================== SECONDARY GRADES (7-9) ==================
-  else {
-    doubleLessonSubjects.forEach(subj => {
-      if(!assign[subj]) return;
-      const slot = findDoubleSlot(subj);
-      if(!slot) return;
-      fillSlot(slot.day, slot.period, subj, true);
-    });
-
-    const multiSubjects = [...subjects.secondary.daily, ...subjects.secondary.fourPerWeek];
     multiSubjects.forEach(subj => {
       while (placed[subj] < weeklyCounts[subj]) {
         let availableSlots = [];
         for (let day of days) {
-          if (schedule[day].some(s => s.includes(subj))) continue;
+          const dayCount = schedule[day].filter(s => s.includes(subj)).length;
+          if (subj === "Creative Arts & Sports") {
+            if (dayCount >= 1 && casDoubleDayUsed) continue; 
+            if (dayCount >= 2) continue;
+          } else {
+            if (schedule[day].some(s => s.includes(subj))) continue;
+          }
+
           for (let p of lessonSlots) {
             if (!schedule[day][p] && isFree(assign[subj], day, p + 1)) {
-              if ((subj==='Mathematics'||subj==='Maths') && !mathsPeriodsOnly.includes(p)) continue;
+              if ((subj === 'Mathematics' || subj === 'Maths') && !mathsPeriodsOnly.includes(p)) continue;
+              if (subj === "Creative Arts & Sports" && p > 0 && schedule[day][p-1].includes(subj)) continue;
               availableSlots.push({ day, p });
             }
           }
         }
+
         if (!availableSlots.length) break;
-        const { day, p } = availableSlots[Math.floor(Math.random()*availableSlots.length)];
+        const { day, p } = availableSlots[Math.floor(Math.random() * availableSlots.length)];
+        if (subj === "Creative Arts & Sports") {
+          const todayCount = schedule[day].filter(s => s.includes(subj)).length;
+          if (todayCount === 1) casDoubleDayUsed = true;
+        }
         fillSlot(day, p, subj);
       }
     });
-  }
 
-  return schedule;
+  } 
+// ================== SECONDARY GRADES (7-9) ==================
+else {
+  // 1️⃣ Place double lessons first
+  doubleLessonSubjects.forEach(subj => {
+    if (!assign[subj]) return;
+    const slot = findDoubleSlot(subj);
+    if (!slot) return;
+    fillSlot(slot.day, slot.period, subj, true);
+  });
+
+  // 2️⃣ Place remaining single-period subjects according to weekly counts
+  const multiSubjects = [...subjects.secondary.daily, ...subjects.secondary.fourPerWeek];
+  multiSubjects.forEach(subj => {
+    while (placed[subj] < weeklyCounts[subj]) {
+      let availableSlots = [];
+      for (let day of days) {
+        if (schedule[day].some(s => s.includes(subj))) continue;
+        for (let p of lessonSlots) {
+          if (!schedule[day][p] && isFree(assign[subj], day, p + 1)) {
+            if ((subj === 'Mathematics' || subj === 'Maths') && !mathsPeriodsOnly.includes(p)) continue;
+            availableSlots.push({ day, p });
+          }
+        }
+      }
+      if (!availableSlots.length) break;
+      const { day, p } = availableSlots[Math.floor(Math.random() * availableSlots.length)];
+      fillSlot(day, p, subj);
+    }
+  });
+
+  // 3️⃣ FINAL FILL FOR SECONDARY — fill any remaining blanks
+  const allSecondarySubjects = [...subjects.secondary.daily, ...subjects.secondary.fourPerWeek];
+  days.forEach(day => {
+    for (let p of lessonSlots) {
+      if (!schedule[day][p]) {
+        // Gather candidates ignoring teacher conflicts for final fill
+        const candidates = allSecondarySubjects.filter(subj =>
+          placed[subj] < weeklyCounts[subj] &&
+          !schedule[day].some(s => s.includes(subj)) &&
+          ((subj !== 'Maths' && subj !== 'Mathematics') || mathsPeriodsOnly.includes(p))
+        );
+        if (candidates.length) {
+          const subj = candidates[Math.floor(Math.random() * candidates.length)];
+          fillSlot(day, p, subj);
+        } else {
+          // Last fallback: pick any daily subject not yet on that day
+          const fallback = subjects.secondary.daily.find(subj =>
+            !schedule[day].some(s => s.includes(subj))
+          );
+          if (fallback) fillSlot(day, p, fallback);
+        }
+      }
+    }
+  });
 }
 
+return schedule;
+
+}
 
 function generateCombinedTimetable() {
   const output = document.getElementById('combined-timetable');
@@ -1527,7 +1538,24 @@ function printThisTimetable(button) {
       const instructions = document.getElementById('instructions');
       instructions.classList.toggle('hidden');
     }
+// Function to delete all teachers
+function deleteAllTeachers() {
+  showCustomConfirm('Are you sure you want to delete all registered teachers?', function(confirmed) {
+    if (confirmed) {
+      // Clear the teachers array
+      teachers = [];
 
+      // Save the empty list to localStorage
+      localStorage.setItem('teachers', JSON.stringify(teachers));
+
+      // Re-render the teacher list
+      updateTeacherLists();
+
+      // Show a success message
+      showCustomAlert('All teachers have been deleted.', 'green');  // Green alert for success
+    }
+  });
+}
 
 </script>
  
