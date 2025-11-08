@@ -1471,19 +1471,57 @@ function showAlert(message, type = "error") {
     }, 500);
   }, 3000);
 }
-
-
 function buildTable(schedule, headers) {
-  let html = `<div style="overflow-x:auto;"><table style="border-collapse: collapse; width: 100%; font-size: 12px;"><thead><tr><th style="border: 1px solid #000; padding: 6px;">Day</th>`;
+
+  // Subject → Color map (add/edit colours here)
+  const subjectColors = {
+    "English": "#ffebee",
+    "Maths": "#e3f2fd",
+    "Mathematics": "#e3f2fd",
+    "Science and Technology": "#e8f5e9",
+    "Integrated Science": "#e8f5e9",
+    "Kiswahili": "#fff8e1",
+    "CRE": "#ede7f6",
+    "Social Studies": "#fff3e0",
+    "Creative Arts & Sports": "#f3e5f5",
+    "Pre-Technical": "#e0f7fa",
+    "Agriculture": "#f1f8e9",
+    "Clubs": "#fce4ec",
+    "PPI": "#e0e0e0",
+    
+    // Special periods
+    "Break": "#bbdefb",   // Light Blue
+    "Tea Break": "#bbdefb",
+    "Short Break": "#bbdefb",
+
+    "Lunch": "#c8e6c9",   // Light Green
+    "Lunch Break": "#c8e6c9",
+
+    "Games": "#e1bee7",   // Light Purple
+    "Games Time": "#e1bee7",
+    "PE": "#e1bee7"
+  };
+
+  const getColor = (text) => {
+    if (!text) return "white";
+    const subject = text.split(" (")[0];
+    return subjectColors[subject] || "#f0f0f0"; // default fallback colour
+  };
+
+  let html = `<div style="overflow-x:auto;"><table style="border-collapse: collapse; width: 100%; font-size: 12px;">
+  <thead><tr><th style="border: 1px solid #000; padding: 6px;">Day</th>`;
+
   headers.forEach(h => {
     html += `<th style="border: 1px solid #000; padding: 6px;">${h.innerText}</th>`;
   });
+
   html += '</tr></thead><tbody>';
 
   for (let day in schedule) {
-    html += `<tr><td style="border: 1px solid #000; padding: 6px;">${day}</td>`;
+    html += `<tr><td style="border: 1px solid #000; padding: 6px; font-weight:bold;">${day}</td>`;
     schedule[day].forEach(period => {
-      html += `<td style="border: 1px solid #000; padding: 6px; text-align: center;">${period || ''}</td>`;
+      const bg = getColor(period);
+      html += `<td style="border: 1px solid #000; padding: 6px; text-align: center; background:${bg};">${period || ''}</td>`;
     });
     html += '</tr>';
   }
@@ -1491,6 +1529,7 @@ function buildTable(schedule, headers) {
   html += '</tbody></table></div>';
   return html;
 }
+
 function printThisTimetable(button) {
   const timetableBlock = button.closest(".extracted-block").cloneNode(true);
   timetableBlock.querySelector("button").remove();
@@ -1514,16 +1553,13 @@ function printThisTimetable(button) {
     </div>
   `;
 
-  // Enhance table styling
+  // don't override cell background colours - only enforce border & text
   const table = timetableBlock.querySelector("table");
   table.style.width = "100%";
   table.style.borderCollapse = "collapse";
   table.style.fontFamily = "Arial, sans-serif";
   table.style.fontSize = "12pt";
   table.style.tableLayout = "fixed";
-  table.style.wordWrap = "break-word";
-  table.style.overflowWrap = "break-word";
-  table.style.color = "black";
 
   table.querySelectorAll("th").forEach(th => {
     th.style.border = "2px solid black";
@@ -1538,8 +1574,6 @@ function printThisTimetable(button) {
     td.style.border = "2px solid black";
     td.style.padding = "8px";
     td.style.textAlign = "center";
-    td.style.wordWrap = "break-word";
-    td.style.overflowWrap = "break-word";
     td.style.color = "black";
   });
 
@@ -1554,17 +1588,27 @@ function printThisTimetable(button) {
         margin: 0;
         padding: 20px;
         color: black;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
+
       table {
         width: 100%;
         table-layout: fixed;
-        color: black;
       }
+
       th, td {
         word-wrap: break-word;
         overflow-wrap: break-word;
-        color: black;
+        border: 2px solid black;
       }
+
+      /* ensure background colors print */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      
       ${isClass ? `
         .print-block {
           page-break-inside: avoid;
@@ -1584,6 +1628,7 @@ function printThisTimetable(button) {
   printWindow.print();
   printWindow.close();
 }
+
  function toggleInstructions() {
       const instructions = document.getElementById('instructions');
       instructions.classList.toggle('hidden');
