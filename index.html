@@ -11,86 +11,166 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
   <title>Smart Master Timetable</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-  #loginSection {
-    display: block;
-    text-align: center;
-    margin: auto;
-    margin-top: 50px;
-    width: 300px;
-    padding: 20px;
-    border: 2px solid #2196F3;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    background-color: #4CAF50; /* Green */
+ <style>
+/* =========================
+   GLOBAL RESET & BASE
+========================= */
+* {
+  box-sizing: border-box;
 }
 
-    #loginSection input[type="text"],
-    #loginSection input[type="password"] {
-        width: calc(100% - 20px);
-        padding: 8px;
-        margin: 10px 0;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-    }
-    #loginSection button {
-        width: 100%;
-        padding: 10px;
-        font-size: 14px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-    }
-    input, select, button {
-      margin: 5px;
-      padding: 5px;
-    }
-    .grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin-top: 20px;
-    }
-    .box {
-      border: 1px solid #ccc;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .timetable-wrapper {
-      width: 100%;
-      overflow-x: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 4px;
-      text-align: center;
-    }
-    th {
-      background-color: #f0f0f0;
-    }
-    .hidden { display: none; }
+body {
+  font-family: Arial, sans-serif;
+  padding: 12px;
+  margin: 0;
+  background: #f9f9f9;
+}
 
- footer {
-  position: fixed;
-  bottom: 0;
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* =========================
+   LOGIN
+========================= */
+#loginSection,
+#login-page {
+  max-width: 350px;
+  width: 95%;
+  margin: 40px auto;
+  padding: 20px;
+  border-radius: 10px;
+  background-color: #a5d6a7;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+#loginSection input,
+#login-page input {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+#loginSection button,
+#login-page button {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* =========================
+   LAYOUT HELPERS
+========================= */
+.flex-responsive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+button i {
+  margin-right: 6px;
+}
+
+/* =========================
+   BOXES & GRIDS
+========================= */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.box {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* =========================
+   TABLES (CRITICAL)
+========================= */
+.timetable-wrapper,
+#combined-timetable {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 900px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+}
+
+th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+/* Double lesson highlight */
+.double-lesson {
+  background: #ffe8a6 !important;
+  font-weight: bold;
+  border: 2px solid #d4a017;
+}
+
+/* =========================
+   INSTRUCTIONS
+========================= */
+.instructions-box {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f4f4f4;
+  border-radius: 10px;
+}
+
+/* =========================
+   FOOTER (SAFE ON MOBILE)
+========================= */
+footer {
+  position: relative;
   width: 100%;
   background-color: #333;
   color: white;
   text-align: center;
   padding: 10px 0;
-  font-size: 16px;
+  font-size: 14px;
+  margin-top: 40px;
   overflow: hidden;
 }
 
@@ -101,29 +181,54 @@
 }
 
 @keyframes marquee {
-  0% {
-    transform: translateX(100%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-  /* Existing styling... */
-    .hidden { display: none; }
-    .instructions-box {
-      margin-top: 20px;
-      padding: 20px;
-      background-color: #f4f4f4;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-    }
-.double-lesson {
-  background: #ffe8a6 !important;   /* light gold */
-  font-weight: bold;
-  border: 2px solid #d4a017;
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
 }
 
-  </style>
+/* =========================
+   MOBILE FIXES
+========================= */
+@media (max-width: 768px) {
+
+  body {
+    padding: 8px;
+  }
+
+  h1, h2, h3 {
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .flex-responsive {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  button {
+    width: 100%;
+  }
+
+  .grid {
+    flex-direction: column;
+  }
+
+  table {
+    font-size: 11px;
+  }
+
+  #grade-selector {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* =========================
+   UTILITIES
+========================= */
+.hidden {
+  display: none;
+}
+</style>
+
 </head>
 <body>
 <!-- Login Section -->
