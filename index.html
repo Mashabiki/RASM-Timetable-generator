@@ -671,6 +671,8 @@ Generate accurate class timetables per stream and get automatic teacher timetabl
   <script>
  let teachers = [];
 const assignments = {};
+// ✅ Mathematics allowed lesson indexes ONLY
+const MATH_ALLOWED_INDEXES = [0, 1, 3, 4, 6];
 
 const subjects = {
   // Subjects for Grades 7-9
@@ -901,7 +903,7 @@ function generateSchedule(grade) {
   if (!assign) return null;
 
   const isPrimary = parseInt(grade) >= 4 && parseInt(grade) <= 6;
-  const mathsPeriodsOnly = [0,1,3,4,6,7]; // periods before 12:55
+  const mathsPeriodsOnly = [0,1,3,4,6]; // periods before 12:15
   const doubleLessonSubjects = ['Integrated Science', 'Creative Arts & Sports', 'Agriculture', 'Pre-Technical'];
   const doubleLessonDaysUsed = new Set();
   const timeGroup = (p) => p <= 2 ? 'early' : p <= 5 ? 'mid' : 'late';
@@ -940,7 +942,11 @@ function generateSchedule(grade) {
     const tid = assign[subj];
     if (!tid) return false;
 
-    if ((subj === 'Mathematics' || subj === 'Maths') && !mathsPeriodsOnly.includes(p)) return false;
+    if (
+  (subj === 'Mathematics' || subj === 'Maths') &&
+  !MATH_ALLOWED_INDEXES.includes(p)
+) return false;
+
 
     if (!isPrimary) {
       if (schedule[day].some(s => s.includes(subj))) return false;
@@ -1015,7 +1021,8 @@ function generateSchedule(grade) {
 
           for (let p of lessonSlots) {
             if (!schedule[day][p] && isFree(assign[subj], day, p + 1)) {
-              if ((subj === 'Mathematics' || subj === 'Maths') && !mathsPeriodsOnly.includes(p)) continue;
+              if ((subj === 'Mathematics' || subj === 'Maths') && !MATH_ALLOWED_INDEXES.includes(p)
+) continue;
               if (subj === "Creative Arts & Sports" && p > 0 && schedule[day][p-1].includes(subj)) continue;
               availableSlots.push({ day, p });
             }
@@ -1052,7 +1059,8 @@ else {
         if (schedule[day].some(s => s.includes(subj))) continue;
         for (let p of lessonSlots) {
           if (!schedule[day][p] && isFree(assign[subj], day, p + 1)) {
-            if ((subj === 'Mathematics' || subj === 'Maths') && !mathsPeriodsOnly.includes(p)) continue;
+            if ((subj === 'Mathematics' || subj === 'Maths') && !MATH_ALLOWED_INDEXES.includes(p)
+) continue;
             availableSlots.push({ day, p });
           }
         }
@@ -1092,36 +1100,106 @@ else {
 return schedule;
 
 }
+function forceFillNoGaps(schedule, grade) {
+  const assign = assignments[grade];
+  if (!assign) return;
+
+  const isPrimary = parseInt(grade) >= 4 && parseInt(grade) <= 6;
+  const mathsPeriodsOnly = [0,1,3,4,6];
+
+  const allowedSubjects = isPrimary
+    ? [
+        ...(subjects.primary.sixPerWeek || []),
+        ...(subjects.primary.fivePerWeek || []),
+        ...(subjects.primary.fourPerWeek || []),
+        ...(subjects.primary.threePerWeek || [])
+      ]
+    : [...subjects.secondary.daily, ...subjects.secondary.fourPerWeek];
+
+  days.forEach(day => {
+    lessonSlots.forEach(p => {
+
+      // Skip breaks / lunch / games
+      if (schedule[day][p]) return;
+
+      for (let subj of allowedSubjects) {
+        const tid = assign[subj];
+        if (!tid) continue;
+
+        // Avoid duplicate subject in same day
+        if (schedule[day].some(s => s.includes(subj))) continue;
+
+        // Maths restriction
+        if (
+  (subj === 'Maths' || subj === 'Mathematics') &&
+  !MATH_ALLOWED_INDEXES.includes(p)
+) continue;
+
+
+        // Teacher availability
+        if (!isFree(tid, day, p + 1)) continue;
+
+        // ✅ FORCE PLACE
+        schedule[day][p] = `${subj} (T${tid})`;
+        occupy(tid, day, p + 1);
+        break;
+      }
+
+      // Absolute fallback (never leave blank)
+      if (!schedule[day][p]) {
+        schedule[day][p] = 'STUDY / REMEDIAL';
+      }
+
+    });
+  });
+}
 
 function generateCombinedTimetable() {
   const output = document.getElementById('combined-timetable');
   output.innerHTML = '';
   teacherSchedule = {};
 
-  const selectedGrades = [...document.querySelectorAll(`#grade-selector input:checked`)].map(g => g.value);
-  if (!selectedGrades.length) return showCustomAlert('Select at least one grade.', 'red');
+  const selectedGrades = [...document.querySelectorAll(`#grade-selector input:checked`)]
+    .map(g => g.value);
+
+  if (!selectedGrades.length)
+    return showCustomAlert('Select at least one grade.', 'red');
 
   const allSchedules = {};
 
   selectedGrades.forEach(grade => {
-    if (!assignments[grade]) return showCustomAlert(`No assignments for Grade ${grade}`, 'orange');
-    allSchedules[grade] = generateSchedule(grade);  // generateSchedule must handle both primary and secondary grades
+    if (!assignments[grade])
+      return showCustomAlert(`No assignments for Grade ${grade}`, 'orange');
+
+    const sched = generateSchedule(grade);
+
+    // 1️⃣ Enforce fixed last lesson for Grade 4–6
+    enforceUpperPrimaryLastLesson(sched, grade);
+
+    // 2️⃣ Fill any remaining blanks safely (NO GAPS)
+    forceFillNoGaps(sched, grade);
+
+    allSchedules[grade] = sched;
   });
 
   const wrapper = document.createElement('div');
   wrapper.className = 'mb-8 p-4 border shadow-md rounded-2xl bg-white overflow-auto';
 
-  const gradeColors = ['#f8f9fa', '#e0f7fa', '#f1f8e9', '#fff3e0', '#fce4ec', '#ede7f6', '#e8f5e9', '#fffde7', '#e3f2fd'];
+  const gradeColors = [
+    '#f8f9fa', '#e0f7fa', '#f1f8e9',
+    '#fff3e0', '#fce4ec', '#ede7f6',
+    '#e8f5e9', '#fffde7', '#e3f2fd'
+  ];
 
   let html = `
     <style>
-      #combined-timetable table, 
-      #combined-timetable th, 
+      #combined-timetable table,
+      #combined-timetable th,
       #combined-timetable td {
         border: 1px solid black;
         border-collapse: collapse;
       }
-      #combined-timetable th, 
+      #combined-timetable th,
       #combined-timetable td {
         padding: 8px;
         text-align: center;
@@ -1158,7 +1236,10 @@ function generateCombinedTimetable() {
   days.forEach(day => {
     Object.entries(allSchedules).forEach(([grade, schedule]) => {
       const bgColor = gradeColorMap[grade];
-      html += `<tr style="background-color: ${bgColor};"><td>${day}</td><td>${grade}</td>`;
+      html += `<tr style="background-color:${bgColor};">
+        <td>${day}</td>
+        <td>${grade}</td>`;
+
       schedule[day].forEach(subject => {
         const lower = subject.toLowerCase();
         let cellClass = '';
@@ -1167,6 +1248,7 @@ function generateCombinedTimetable() {
         else if (lower.includes('games')) cellClass = 'games-cell';
         html += `<td class="${cellClass}">${subject}</td>`;
       });
+
       html += `</tr>`;
     });
   });
@@ -1174,6 +1256,44 @@ function generateCombinedTimetable() {
   html += `</tbody></table>`;
   wrapper.innerHTML = html;
   output.appendChild(wrapper);
+}
+function enforceUpperPrimaryLastLesson(schedule, grade) {
+  const g = parseInt(grade);
+  if (g < 4 || g > 6) return;
+
+  const lastPeriod = lessonSlots[lessonSlots.length - 1];
+
+  const orderedSubjects = [
+    'Clubs and Societies',      // Monday
+    'Games & Sports',           // Tuesday
+    'Guidance & Counseling',    // Wednesday
+    'Careers',                  // Thursday
+    'Free'                      // Friday
+  ];
+
+  days.forEach((day, index) => {
+    const subj = orderedSubjects[index];
+    if (!subj) return;
+
+    // Clear anything previously placed there
+    schedule[day][lastPeriod] = '';
+
+    const tid = assignments[grade][subj];
+
+    // If subject has a teacher, occupy safely
+    if (tid) {
+      if (isFree(tid, day, lastPeriod + 1)) {
+        schedule[day][lastPeriod] = `${subj} (T${tid})`;
+        occupy(tid, day, lastPeriod + 1);
+      } else {
+        // Teacher collision fallback
+        schedule[day][lastPeriod] = subj;
+      }
+    } else {
+      // Subjects like "Free"
+      schedule[day][lastPeriod] = subj;
+    }
+  });
 }
 
 function showCustomAlert(message, color) {
@@ -1754,6 +1874,15 @@ function deleteAllTeachers() {
       // Show a success message
       showCustomAlert('All teachers have been deleted.', 'green');  // Green alert for success
     }
+  });
+}
+function assertNoGaps(schedule, grade) {
+  days.forEach(day => {
+    lessonSlots.forEach(p => {
+      if (!schedule[day][p]) {
+        throw `❌ GAP FOUND: Grade ${grade}, ${day}, Period ${p}`;
+      }
+    });
   });
 }
 
